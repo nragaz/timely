@@ -1,0 +1,1 @@
+Spreadsheet.client_encoding = 'UTF-8' if defined? Spreadsheet
