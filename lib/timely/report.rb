@@ -275,7 +275,7 @@ module Timely
         all_values[""].keys.each do |k|
           unless k.empty?
             values[k] = row[:rows].map { |r| all_values[r][k].to_f }.inject(fn)
-            values[k] = values[k].round(2) if values[k].respond_to?(:round)
+            # values[k] = values[k].round(2) if values[k].respond_to?(:round)
           end
         end
       else
