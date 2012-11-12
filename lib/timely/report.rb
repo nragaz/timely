@@ -13,17 +13,17 @@ module Timely
       day: 'Day',
       hour: 'Hour'
     }
-  
+
     SIMPLE_FUNCTIONS      = [:count, :cumulative]
     ONE_COLUMN_FUNCTIONS  = [:sum, :average, :stddev, :present]
     DATE_FUNCTIONS        = [
       :avg_hours_between, :avg_week_hours_between, :avg_days_between
     ]
     FUNCTIONS = SIMPLE_FUNCTIONS + ONE_COLUMN_FUNCTIONS + DATE_FUNCTIONS
-  
+
     SUMMARY_FUNCTIONS     = [:sum, :divide, :multiply]
 
-    DEFAULT_LENGTHS = { 
+    DEFAULT_LENGTHS = {
       year: 3,
       quarter: 6,
       month: 6,
@@ -67,18 +67,18 @@ module Timely
 
     def self.validate_function(row)
       name, args = Report.function_arguments(row)
-  
+
       unless FUNCTIONS.include?(name)
         raise "Unrecognized function (try #{FUNCTIONS.join(", ")})"
       end
-  
+
       if ONE_COLUMN_FUNCTIONS.include?(name)
         raise "#{name} requires one column name" unless args.length == 1
       elsif DATE_FUNCTIONS.include?(name)
         raise "#{name} requires two column names" unless args.length == 2
       end
     end
-  
+
     def self.validate_summary_function(name)
       unless SUMMARY_FUNCTIONS.include?(name)
         raise "Summary function not recognized (try #{SUMMARY_FUNCTIONS.join(", ")})"
@@ -90,7 +90,7 @@ module Timely
     def initialize(title, options={}, &block)
       options.to_options!
       options.reject! { |k,v| v.nil? || (v.respond_to?(:empty?) && v.empty?) }
-    
+
       self.title = title
       self.period = options[:period].try(:intern) || :month
       self.length =
@@ -103,9 +103,9 @@ module Timely
       self.date_format =
         options[:date_format] || Report.default_date_format(period)
       self.filter = options[:filter] || nil
-    
+
       self.rows = []
-    
+
       instance_eval(&block)
     end
 
@@ -116,7 +116,7 @@ module Timely
         @starts_at.send("beginning_of_#{period}")
       end
     end
-  
+
     def ends_at
       if period == :quarter
         starts_at.advance(months: length*3)
@@ -124,23 +124,23 @@ module Timely
         starts_at.advance(period.to_s.pluralize.to_sym => length)
       end
     end
-  
+
     def length_in_seconds
       ends_at - starts_at
     end
-  
+
     # must be set after starts_at
     def ends_at=(ends_at)
       new_length = 0
       periods = period.to_s.pluralize.to_sym
-    
+
       until self.starts_at + new_length.send(periods) > ends_at
         new_length += 1
       end
-    
+
       self.length = new_length
     end
-  
+
     def columns
       columns = {}
       key = period == :quarter ? :months : period.to_s.pluralize.to_sym
@@ -151,7 +151,7 @@ module Timely
         columns[date_group_format(dt)] = dt.strftime(date_format)
       }
       columns[:total] = "Total" if show_totals
-  
+
       columns
     end
 
@@ -160,11 +160,11 @@ module Timely
       columns.keys +
       (show_totals ? ["Total"] : [])
     end
-  
+
     def show_totals?
       show_totals
     end
-  
+
     def row(title, scope, date_column, function, options={})
       row = {
         type: :function,
@@ -174,18 +174,18 @@ module Timely
         function: function,
         options: options
       }
-  
+
       Report.validate_function(row)
       unless row[:scope].respond_to?(:to_sql) || row[:scope].respond_to?(:call)
         row[:scope] = row[:scope].scoped
       end
-  
+
       @rows << row
-    
+
       if row[:options][:percentage_of]
         @rows.last[:options][:hidden] = true
         @rows.last[:title] = "~ #{@rows.last[:title]}"
-      
+
         summary_row(
           title,
           :divide,
@@ -194,13 +194,13 @@ module Timely
         )
       end
     end
-  
+
     # Used to aggregate values from multiple rows. Combine with :hidden option
     # on other rows to only show the summary. Note that the other rows need
     # to be defined first.
     def summary_row(title, function, rows, options={})
       Report.validate_summary_function(function)
-    
+
       @rows << {
         type: :summary,
         title: title,
@@ -217,12 +217,12 @@ module Timely
         rows.each { |row| h.delete(row[:title]) if row[:options][:hidden] }
       }
     end
-  
+
     def to_a
       keyed_hash = {}
       to_hash.each do |title, values|
         title = "column" if title.blank?
-      
+
         values.each do |date, val|
           keyed_hash[date] ||= {}
           keyed_hash[date][title] = val
@@ -259,18 +259,18 @@ module Timely
 
     def get_values(row, all_values)
       start_time = Time.now
-    
+
       if row[:type] == :summary
         unless (row[:rows] - all_values.keys).empty?
           raise "Calculated rows not present (#{row[:rows].join(", ")} in #{all_values.keys.join(", ")}) - try reordering your report"
         end
-      
+
         fn =
           row[:function] == :sum ? :+ :
           row[:function] == :divide ? :safely_divide :
           row[:function] == :multiply ? :* :
           nil
-      
+
         values = {}
         all_values[""].keys.each do |k|
           unless k.empty?
@@ -281,7 +281,7 @@ module Timely
       else
         function_name, function_args = Report.function_arguments(row)
         scope = row_scope(row)
-      
+
         case function_name
         when :count
           values = scope.count
@@ -320,9 +320,9 @@ module Timely
           values[group] ||= 0 unless group == :total
         }
         values.keys.each { |k| values.delete(k) unless columns.include?(k) }
-      
+
         values = values.sorted_hash
-      
+
         if show_totals && function_name == :cumulative
           values[:total] = values.values.last
         elsif show_totals && [:count, :present, :sum].include?(function_name)
@@ -356,13 +356,13 @@ module Timely
                            to_f.round(2) || 0
         end
       end
-  
+
       values.each { |k,v|
         values[k] = row[:options][:map].call(v)
       } if row[:options][:map]
-  
+
       Rails.logger.info "[timely] #{Time.now - start_time}s - #{title} - #{row[:title]} (by #{period})"
-  
+
       values
     end
 
@@ -374,27 +374,21 @@ module Timely
 
     def row_scope(row)
       date_col = date_column_sql(row)
-      
-      filtered_scope(row).
-        where(
-          "#{date_col} >= ? AND #{date_col} < ?",
-          starts_at,
-          ends_at
-        ).
-        group( period_group(date_col) ).
-        reorder( date_col )
+      start_val = date_col =~ /_on\z/ ? starts_at.to_date : starts_at
+      end_val = date_col =~ /_on\z/ ? ends_at.to_date : ends_at
+      filtered_scope(row).where("#{date_col} >= ? AND #{date_col} < ?", start_val, end_val).group( period_group(date_col) ).reorder( date_col )
     end
-  
+
     def rolling_base(row)
       filtered_scope(row).where("#{date_column_sql(row)} < ?", starts_at).count
     end
-  
+
     def filtered_scope(row)
       row[:scope].respond_to?(:call) ?
         row[:scope].call(self.filter) :
         row[:scope]
     end
-  
+
     def date_column_sql(row)
       row[:date_column].include?(".") ?
         row[:date_column] :
@@ -434,7 +428,7 @@ module Timely
         date.strftime("%Y%m%d%H")
       end
     end
-  
+
     def tz(column)
       if column.last(2) == "on"
         # it's a date
@@ -454,16 +448,16 @@ module Timely
         function_args[1] : "#{scope.table_name}.#{function_args[1]}"
       older_date = function_args[0].include?(".") ?
         function_args[0] : "#{scope.table_name}.#{function_args[0]}"
-    
+
       [newer_date, older_date]
     end
-  
+
     def avg_hours(scope, function_args)
       newer_date, older_date = date_column_names(scope, function_args)
-    
+
       "TIMESTAMPDIFF(MINUTE, #{older_date}, #{newer_date}) / 60"
     end
-    
+
     # This is equivalent to the following, with substitutions:
     #  @new := reports.downloaded_at,
     #  @old := pages.created_at,
@@ -475,7 +469,7 @@ module Timely
     #  @extraFirstWeekSecs := TIME_TO_SEC( TIMEDIFF(@old, @oldWeekSaturday) ),
     #  @extraFirstWeekSecs := (@extraFirstWeekSecs > 0) * @extraFirstWeekSecs,
     #  @newWeekSaturday := STR_TO_DATE( CONCAT(DATE_FORMAT(@new, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s'),
-    #  @extraLastWeekSecs := TIME_TO_SEC( TIMEDIFF(@new, @newWeekSaturday) ), 
+    #  @extraLastWeekSecs := TIME_TO_SEC( TIMEDIFF(@new, @newWeekSaturday) ),
     #  @extraLastWeekSecs := (@extraLastWeekSecs > 0) * @extraLastWeekSecs,
     #  @totalSecs := TIME_TO_SEC( TIMEDIFF(@new, @old) ),
     #  @totalHours := @totalSecs / 3600 as total_hours,
@@ -491,13 +485,13 @@ module Timely
     # be counted)
     def avg_week_hours(scope, function_args)
       newer_date, older_date = date_column_names(scope, function_args)
-      
+
       "((TIME_TO_SEC( TIMEDIFF(#{newer_date}, #{older_date}) ) - ( ( WEEK(#{newer_date}, 2) - ( WEEK(#{older_date}, 2) - ( ( YEAR(#{newer_date}) - YEAR(#{older_date}) ) * 52 ) ) ) * 172800 )) + (( TIME_TO_SEC( TIMEDIFF(#{older_date}, STR_TO_DATE( CONCAT( DATE_FORMAT(#{older_date}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s' ))) > 0) * TIME_TO_SEC( TIMEDIFF(#{older_date}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{older_date}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) + ((TIME_TO_SEC( TIMEDIFF(#{newer_date}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{newer_date}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) ) > 0) * TIME_TO_SEC( TIMEDIFF(#{newer_date}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{newer_date}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) ) / 3600"
     end
 
     def avg_days(scope, function_args)
       newer_date, older_date = date_column_names(scope, function_args)
-  
+
       "DATEDIFF(#{tz(newer_date)}, #{tz(older_date)})"
     end
   end
