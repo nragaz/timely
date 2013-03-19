@@ -288,6 +288,12 @@ module Timely
         when :cumulative
           values = scope.count
           base = rolling_base(row)
+
+          columns.each { |group, heading|
+            values[group] ||= 0 unless group == :total
+          }
+          values = Hash[values.sort]
+
           values.each do |k,v|
             values[k] = v + base
             base += v
