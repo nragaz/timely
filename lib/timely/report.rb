@@ -1,7 +1,5 @@
 # encoding: UTF-8
 
-require 'activesupport/lib/active_support/core_ext/numeric/time'
-
 class Timely::Report
   ## Class Definition ##
 
@@ -43,11 +41,10 @@ class Timely::Report
   attr_accessor :title, :period, :length, :starts_at
 
   # This can be overridden to set defaults by calling super(default args)
-  def initialize(title, options={}, &block)
+  def initialize(options={}, &block)
     options = options.symbolize_keys
     options.reverse_merge! period: :month
 
-    self.title        = title
     self.period       = options[:period].try(:intern)
     self.length       = options[:length] || default_length
     self.starts_at    = options[:starts_at] || default_starts_at
@@ -57,7 +54,7 @@ class Timely::Report
   end
 
   def to_s
-    "<Timely::Report title: '#{title}' period: #{period} starts_at: #{starts_at} length: #{length}>"
+    "<Timely::Report title: \"#{title}\" period: #{period} starts_at: #{starts_at} length: #{length}>"
   end
 
   # ensure that period is a valid symbol and not dangerous
