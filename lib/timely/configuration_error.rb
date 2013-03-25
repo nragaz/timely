@@ -1,2 +1,1 @@
-class ConfigurationError < Exception
-end
+class Timely::ConfigurationError < Exception ; end
