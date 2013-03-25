@@ -56,6 +56,10 @@ class Timely::Report
     instance_eval(&block)
   end
 
+  def to_s
+    "<Timely::Report title: '#{title}' period: #{period} starts_at: #{starts_at} length: #{length}>"
+  end
+
   # ensure that period is a valid symbol and not dangerous
   def period=(val)
     if Timely::PERIODS.include?(val.to_s)

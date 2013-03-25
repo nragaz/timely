@@ -60,6 +60,10 @@ module Timely
     yield self
   end
 
+  def self.periods
+    PERIODS
+  end
+
   class Engine < Rails::Engine
   end
 end
