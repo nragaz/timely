@@ -3,15 +3,21 @@
 class Timely::Rows::AverageDaysBetween < Timely::Row
   self.default_options = { transform: :round }
 
-  def avg_days_sql(function_args)
-    older, newer = date_column_names(function_args)
-    "DATEDIFF(#{tz(newer)}, #{tz(older)})"
+  private
+
+  def raw_value_from(scope)
+    scope.average query
   end
 
-  def date_column_names(function_args)
-    older = disambiguate_column_name(function_args[0])
-    newer = disambiguate_column_name(function_args[1])
+  def query
+    "DATEDIFF(#{to}, #{from})"
+  end
 
-    [older, newer]
+  def from
+    @from ||= disambiguate_column_name column[:from]
+  end
+
+  def to
+    @to ||= disambiguate_column_name column[:to]
   end
 end

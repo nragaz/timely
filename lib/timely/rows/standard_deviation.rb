@@ -3,7 +3,17 @@
 class Timely::Rows::StandardDeviation < Timely::Row
   self.default_options = { transform: :round }
 
-  def stddev_sql(function_args)
-    "STDDEV(#{function_args.first}) as sd_val, #{group_column_sql} as sd_group_key"
+  private
+
+  def raw_value_from(scope)
+    scope.select(query).first.sd_val
+  end
+
+  def query
+    "STDDEV(#{column}) as sd_val"
+  end
+
+  def column
+    @column ||= disambiguate_column_name options[:column]
   end
 end

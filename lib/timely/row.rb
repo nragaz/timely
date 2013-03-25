@@ -13,7 +13,8 @@ module Timely
     # Options:
     #    cacheable: if true, cache past values in Redis
     #    transform: proc to apply to each value (e.g. for rounding), or pass
-    #    `:round` to apply default rounding (two-decimal precision)
+    #    `:round` to apply default rounding (two-decimal precision) or `:to_i`
+    #    to round to 0 decimals
     def initialize(title, key, scope, options={})
       options.reverse_merge! default_options.reverse_merge(cacheable: true)
 
@@ -21,10 +22,6 @@ module Timely
       self.key = key
       self.scope = scope
       self.options = options
-    end
-
-    def cacheable?
-      !!options[:cacheable]
     end
 
     def title
@@ -35,112 +32,46 @@ module Timely
       title.parameterize
     end
 
-    def value(starts_at, ends_at)
-      function_name, function_args = extract_function_arguments
-
-      values = begin
-        case function_name
-        when :count
-          grouped_scope.count
-        when :cumulative
-          values = grouped_scope.count
-          base = cumulative_base_count
-
-          columns.each do |group, heading|
-            values[group] ||= 0 unless group == :total
-          end
-
-          values = Hash[values.sort]
-
-          values.each do |k,v|
-            values[k] = v + base
-            base += v
-          end
-
-          values
-        when :present
-          presence_column = function_args.first
-          conditions = present_conditions(presence_column)
-          grouped_scope.where(*conditions).count
-        when :sum
-          values_to_i grouped_scope.sum(function_args.first)
-        when :average
-          value = grouped_scope.average(function_args.first)
-        when :stddev
-          query = stddev_sql(function_args)
-          raw = grouped_scope.select(query)
-          Hash[ raw.map { |o| [o.sd_group_key, o.sd_val] } ]
-        when :avg_hours_between
-          query = avg_hours_sql(function_args)
-          value = grouped_scope.average(query)
-        when :avg_week_hours_between
-          query = avg_week_hours_sql(function_args)
-          value = grouped_scope.average(query)
-        when :avg_days_between
-          query = avg_days_sql(function_args)
-          value = grouped_scope.average(query)
-        end
-      end
-
-      transform value
+    def cacheable?
+      !!options[:cacheable]
     end
 
-    def total
-      function_name, function_args = extract_function_arguments
+    ## Values ##
 
-      case function_name
-      when :cumulative
-        values.values.last
-      when :count, :present, :sum
-        values.values.inject(0) { |sum, value| sum += value }
-      when :average
-        round filtered_scope.average(function_args.first)
-      when :stddev
-        query = stddev_sql(function_args)
-        round filtered_scope.select(query).map { |r| r.sd_val }.first
-      when :avg_hours_between
-        query = avg_hours_sql(function_args)
-        round filtered_scope.average(query)
-      when :avg_week_hours_between
-        query = avg_week_hours_sql(function_args)
-        round filtered_scope.average(query)
-      when :avg_days_between
-        query = avg_days(function_args)
-        round filtered_scope.average(query)
-      end
+    # override value or raw_value in subclasses
+    def value(starts_at, ends_at)
+      transform raw_value_from date_range_scope(starts_at, ends_at)
+    end
 
-      transform value
+    def total(ends_at)
+      transform raw_value_from date_range_scope(nil, ends_at)
+    end
+
+    private
+
+    # override in subclasses to perform a custom calculation
+    def raw_value_from(scope)
+      scope.count
     end
 
     private
 
     ## Helpers ##
 
-    # if the column name does not specify the table, add the table name
-    def disambiguate_column_name(col)
-      col.include?(".") ? col : "#{scope.table_name}.#{col}"
-    end
-
     # helper function for rounding non-integer values for nicer output
     def round(val)
       val ? val.to_f.round(Timely.default_precision) : 0
     end
 
-    # apply the round function to all of the values in a hash
-    def round_values(hash)
-      hash.each { |key, value| hash[key] = round(value) }
-    end
-
-    # convert all of the values in a hash to integers
-    def values_to_i(hash)
-      hash.each { |key, value| hash[key] = value.to_i }
-    end
-
+    # transform the given value using either one of the default
+    # transformations (:round or :to_i) or a custom proc
     def transform(value)
       transform = options[:transform]
 
       if transform == :round
         round value
+      elsif transform == :to_i
+        value.round
       elsif transform
         transform.call(value)
       else
@@ -151,67 +82,35 @@ module Timely
     ## Scopes ##
 
     # only return records between the reporting dates
-    def filtered_scope
-      tz = key_sql_with_timezone
+    def date_range_scope(starts_at, ends_at)
+      starts = starts_at && key_is_date? ? starts_at.to_date : starts_at
+      ends = ends_at && key_is_date? ? ends_at.to_date : ends_at
 
-      starts = key_is_date? ? starts_at.to_date : starts_at
-      ends = key_is_date? ? ends_at.to_date : ends_at
-
-      scope.where("#{tz} >= ? AND #{tz} < ?", starts, ends)
-    end
-
-    # group the records by the grouping column
-    def grouped_scope
-      filtered_scope.group( group_column_sql ).reorder( date_col )
+      if starts && ends
+        scope.where("#{key_sql} >= ? AND #{key_sql} < ?", starts, ends)
+      elsif starts
+        scope.where("#{key_sql} >= ?", starts)
+      elsif ends
+        scope.where("#{key_sql} < ?", ends)
+      else
+        scope
+      end
     end
 
     ## Column Names ##
 
+    # if the column name does not specify the table, add the table name
+    def disambiguate_column_name(col)
+      col.include?(".") ? col : "#{scope.table_name}.#{col}"
+    end
+
     def key_sql
-      @key_sql ||= begin
-        disambiguate_column_name key
-      end
+      @key_sql ||= disambiguate_column_name key
     end
 
     # check if a date column's name ends in _on (vs. _at)
     def key_is_date?
-      key =~ /_on\z/
-    end
-
-    # if the key is a timestamp, convert the timezone from UTC to local time
-    def key_sql_with_timezone
-      @key_sql_with_timezone ||= unless key_is_date?
-        "IFNULL(CONVERT_TZ(#{key_sql}, 'UTC', 'Canada/Eastern'), #{key_sql})"
-      else
-        key_sql
-      end
-    end
-
-    def group_column_sql
-      tz = date_column_sql_with_timezone
-
-      case period
-      when :year
-        "DATE_FORMAT(#{tz}, '%Y')"
-      when :quarter
-        "CONCAT(YEAR(#{tz}), QUARTER(#{tz}))"
-      when :month
-        "DATE_FORMAT(#{tz}, '%Y%m')"
-      when :week
-        "CONVERT(YEARWEEK(#{tz}, 3), CHAR)"
-      when :day
-        "DATE_FORMAT(#{tz}, '%Y%m%d')"
-      when :hour
-        "DATE_FORMAT(#{tz}, '%Y%m%d%H')"
-      end
-    end
-
-    ## Function Calculations ##
-
-    def extract_function_arguments
-      @function_arguments ||= begin
-        function.is_a?(Hash) ? [function.keys.first, [*function.values.first]] : [function, []]
-      end
+      @key_is_date ||= (key =~ /_on\z/)
     end
   end
 end

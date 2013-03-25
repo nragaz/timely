@@ -3,9 +3,16 @@
 class Timely::Rows::AverageWeekHoursBetween < Timely::Row
   self.default_options = { transform: :round }
 
+  private
+
+  def raw_value_from(scope)
+    scope.average query
+  end
+
   # This is equivalent to the following, with substitutions:
-  #  @new := reports.downloaded_at,
-  #  @old := pages.created_at,
+  #
+  #  @old := objects.created_at,
+  #  @new := objects.completed_at,
   #  @oldWeek := WEEK(@old, 2),
   #  @newWeek := WEEK(@new, 2),
   #  @weekends := @newWeek - @oldWeek,
@@ -28,15 +35,15 @@ class Timely::Rows::AverageWeekHoursBetween < Timely::Row
   # the dates themselves (e.g. if the first date is *on* a weekend, then
   # the hours between the weekend beginning and the first date should not
   # be counted)
-  def avg_week_hours_sql(function_args)
-    older, newer = date_column_names(function_args)
-    "((TIME_TO_SEC( TIMEDIFF(#{newer}, #{older}) ) - ( ( WEEK(#{newer}, 2) - ( WEEK(#{older}, 2) - ( ( YEAR(#{newer}) - YEAR(#{older}) ) * 52 ) ) ) * 172800 )) + (( TIME_TO_SEC( TIMEDIFF(#{older}, STR_TO_DATE( CONCAT( DATE_FORMAT(#{older}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s' ))) > 0) * TIME_TO_SEC( TIMEDIFF(#{older}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{older}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) + ((TIME_TO_SEC( TIMEDIFF(#{newer}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{newer}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) ) > 0) * TIME_TO_SEC( TIMEDIFF(#{newer}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{newer}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) ) / 3600"
+  def query
+    "((TIME_TO_SEC( TIMEDIFF(#{to}, #{from}) ) - ( ( WEEK(#{to}, 2) - ( WEEK(#{from}, 2) - ( ( YEAR(#{to}) - YEAR(#{from}) ) * 52 ) ) ) * 172800 )) + (( TIME_TO_SEC( TIMEDIFF(#{from}, STR_TO_DATE( CONCAT( DATE_FORMAT(#{from}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s' ))) > 0) * TIME_TO_SEC( TIMEDIFF(#{from}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{from}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) + ((TIME_TO_SEC( TIMEDIFF(#{to}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{to}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) ) > 0) * TIME_TO_SEC( TIMEDIFF(#{to}, STR_TO_DATE( CONCAT(DATE_FORMAT(#{to}, '%X%V'), ' Saturday'), '%X%V %W %h-%i-%s')) )) ) / 3600"
   end
 
-  def date_column_names(function_args)
-    older = disambiguate_column_name(function_args[0])
-    newer = disambiguate_column_name(function_args[1])
+  def from
+    @from ||= disambiguate_column_name column[:from]
+  end
 
-    [older, newer]
+  def to
+    @to ||= disambiguate_column_name column[:to]
   end
 end
