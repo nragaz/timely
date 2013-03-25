@@ -25,10 +25,7 @@ class Timely::Report
     # in the report to filter your scopes. For example, you may
     # want to have a `user` attribute on the report and scope each
     # row's data to that user's associations.
-    def row(title, key=nil, klass=nil, options={}, &scope)
-      key ||= default_key
-      klass ||= default_klass
-
+    def row(title, key=default_key, klass=default_klass, options={}, &scope)
       @_row_args  ||= []
       @_row_scopes ||= []
 
@@ -40,10 +37,11 @@ class Timely::Report
 
     private
 
+    # :count -> Timely::Rows::Count
     def symbol_to_row_class(sym)
       Timely::Rows.const_get(sym.to_s.camelcase)
     rescue
-      raise ConfigurationError, "No row class defined for #{klass}"
+      raise Timely::ConfigurationError, "No row class defined for #{klass}"
     end
   end
 
@@ -70,10 +68,10 @@ class Timely::Report
 
   # ensure that period is a valid symbol and not dangerous
   def period=(val)
-    if Timely::PERIODS.include?(val.to_s)
+    if Timely.periods.include?(val.to_s)
       @period = val.to_sym
     else
-      raise ConfigurationError, "period must be in the list: #{Timely::PERIODS.join(", ")} (provided #{val})"
+      raise Timely::ConfigurationError, "period must be in the list: #{Timely.periods.join(", ")} (provided #{val})"
     end
   end
 
@@ -85,7 +83,7 @@ class Timely::Report
   # round the given time to the beginning of the period in which the
   # provided time falls
   def starts_at=(val)
-    raise ConfigurationError, "period must be set before setting starts_at" unless period
+    raise Timely::ConfigurationError, "period must be set before setting starts_at" unless period
 
     if val == :hour
       @starts_at = val.change(min: 0, sec: 0)
@@ -96,7 +94,7 @@ class Timely::Report
 
   # recalculate the length so that the report includes the given date
   def ends_at=(val)
-    raise ConfigurationError, "starts_at must be set before setting ends_at" unless starts_at
+    raise Timely::ConfigurationError, "starts_at must be set before setting ends_at" unless starts_at
 
     duration_in_seconds = val - starts_at
     period_duration = period == :quarter ? 3.months : 1.send(period)
@@ -177,7 +175,7 @@ class Timely::Report
     formatter_klass = Timely::Formats.const_get(formatter_name.camelcase)
     to_format formatter_klass, options
   rescue
-    raise ConfigurationError, "No class found for #{formatter_klass}"
+    raise Timely::ConfigurationError, "No class found for #{formatter_klass}"
   end
 
   # :month -> :months, etc.
