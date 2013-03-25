@@ -23,7 +23,7 @@ module Timely
     end
 
     def value
-      cacheable? ? value_with_caching : raw_value
+      cacheable? ? value_with_caching : value_without_caching
     end
 
     def cacheable?
@@ -31,34 +31,48 @@ module Timely
     end
 
     def cache_key
-      [report.cache_key, row.cache_key, column.cache_key]
+      [report.cache_key, row.cache_key, column.cache_key].join(cache_sep)
     end
 
     private
 
-    def raw_value
+    def value_without_caching
       row.value(column.starts_at, column.ends_at)
     end
 
     def value_with_caching
-      if Timely.redis
-        value_from_redis
-      else
-        Rails.cache.fetch(cache_key) { raw_value }
-      end
+      Timely.redis ? value_from_redis : value_from_rails_cache
     end
 
-    def value_from_redis
-      redis_key = cache_key.join(Timely.cache_separator)
+    def value_from_rails_cache
+      Rails.cache.fetch(cache_key) { raw_value }
+    end
 
-      if val = Timely.redis.get(redis_key)
+    # retrieve a cached value from a redis hash.
+    #
+    # hashes are accessed using the report title and row title. values within
+    # the hash are keyed using the column's start/end timestamps
+    def value_from_redis
+      if val = Timely.redis.hget(redis_hash_key, redis_value_key)
         val = BigDecimal.new(val)
       else
         val = raw_value
-        Timely.redis.set(redis_key, val)
+        Timely.redis.set(redis_hash_key, redis_value_key, val)
       end
 
       val
+    end
+
+    def redis_hash_key
+      @redis_hash_key ||= [report.cache_key, row.cache_key].join(cache_sep)
+    end
+
+    def redis_value_key
+      @redis_value_key ||= column.cache_key
+    end
+
+    def cache_sep
+      Timely.cache_separator
     end
   end
 end
