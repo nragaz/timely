@@ -1,8 +1,12 @@
 # encoding: UTF-8
 
 class Timely::Row
+  ## Defaults ##
+
   class_attribute :default_options, instance_writer: false
   self.default_options = {}
+
+  ## Instance Definition ##
 
   attr_accessor :title, :key, :scope, :options
 

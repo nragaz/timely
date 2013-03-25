@@ -5,6 +5,14 @@ class Timely::Report
 
   class_attribute :_row_args, :_row_scopes, instance_writer: false
 
+  ## Default Row Settings ##
+
+  class_attribute :default_key
+  self.default_key = :created_at
+
+  class_attribute :default_klass
+  self.default_klass = :total_count
+
   class << self
     # Define the report's rows in a subclass:
     #
@@ -17,7 +25,10 @@ class Timely::Report
     # in the report to filter your scopes. For example, you may
     # want to have a `user` attribute on the report and scope each
     # row's data to that user's associations.
-    def row(title, key, klass, options={}, &scope)
+    def row(title, key=nil, klass=nil, options={}, &scope)
+      key ||= default_key
+      klass ||= default_klass
+
       @_row_args  ||= []
       @_row_scopes ||= []
 
