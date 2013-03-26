@@ -1,5 +1,5 @@
 Gem::Specification.new do |spec|
-  spec.name         = "timely"
+  spec.name         = "timely_reports"
   spec.summary      = "Create reports about periods of time in your database."
   spec.description  = "Create reports about periods of time in your database."
   spec.files        = Dir["lib/**/*"]+["MIT-LICENSE", "Rakefile", "README.md"]
