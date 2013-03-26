@@ -3,7 +3,7 @@ Gem::Specification.new do |spec|
   spec.summary      = "Create reports about periods of time in your database."
   spec.description  = "Create reports about periods of time in your database."
   spec.files        = Dir["lib/**/*"]+["MIT-LICENSE", "Rakefile", "README.md"]
-  spec.version      = "0.9"
+  spec.version      = "0.9.1"
   spec.authors      = ["Nick Ragaz"]
   spec.email        = "nick.ragaz@gmail.com"
   spec.homepage     = "http://github.com/nragaz/timely"
