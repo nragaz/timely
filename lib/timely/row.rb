@@ -21,10 +21,10 @@ class Timely::Row
   def initialize(title, key, scope, options={})
     options.reverse_merge! default_options.reverse_merge(cacheable: true)
 
-    self.title = title
-    self.key = key
-    self.scope = scope
-    self.options = options
+    self.title    = title
+    self.key      = key
+    self.scope    = scope
+    self.options  = options
   end
 
   def to_s

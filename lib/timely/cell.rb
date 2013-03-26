@@ -27,7 +27,7 @@ module Timely
     end
 
     def value
-      cacheable? ? value_with_caching : value_without_caching
+      @value ||= cacheable? ? value_with_caching : value_without_caching
     end
 
     def cacheable?
@@ -35,7 +35,7 @@ module Timely
     end
 
     def cache_key
-      [report.cache_key, row.cache_key, column.cache_key].join(cache_sep)
+      @cache_key ||= [report.cache_key, row.cache_key, column.cache_key].join(cache_sep)
     end
 
     private

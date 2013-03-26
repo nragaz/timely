@@ -31,7 +31,7 @@ class Timely::Report
 
       klass = symbol_to_row_class klass if klass.is_a?(Symbol)
 
-      self._row_args << [klass, [title, key, options]]
+      self._row_args   << [klass, [title, key, options]]
       self._row_scopes << scope
     end
 
@@ -55,11 +55,15 @@ class Timely::Report
     options = options.symbolize_keys
     options.reverse_merge! period: :month
 
-    self.period     = options[:period]
-    self.length     = options[:length] || default_length
-    self.starts_at  = options[:starts_at] || default_starts_at
-    self.ends_at    = options[:ends_at] if options.has_key?(:ends_at)
+    self.period     = options.delete(:period)
+    self.length     = options.delete(:length)    || default_length
+    self.starts_at  = options.delete(:starts_at) || default_starts_at
+    self.ends_at    = options.delete(:ends_at)   if options.has_key?(:ends_at)
     self.options    = options
+  end
+
+  def title
+    @title.is_a?(Symbol) ? I18n.t("timely.reports.#{@title}") : @title
   end
 
   def to_s
@@ -116,9 +120,10 @@ class Timely::Report
   # return an array of row objects after evaluating each row's scope in the
   # context of self
   def rows
-    @rows ||= _row_args.map.with_index do |args, i|
-      klass, args = args
+    @rows ||= _row_args.map.with_index do |row_args, i|
+      klass, args = row_args
 
+      args    = args.dup
       options = args.extract_options!
       proc    = _row_scopes[i]
       scope   = self.instance_eval(&proc)
@@ -135,28 +140,26 @@ class Timely::Report
     end
   end
 
-  def title
-    @title.is_a?(Symbol) ? I18n.t("timely.reports.#{@title}") : @title
+  def cells(row)
+    (@cells ||= {})[row.title] ||= columns.map do |col|
+      Timely::Cell.new(self, col, row)
+    end
+  end
+
+  # return a hash where each row is a key pointing to an array of cells
+  def raw
+    @cache ||= Hash[ rows.map { |row| [row, cells(row)] } ]
+  end
+
+  # pass in a custom object that responds to `output`
+  def to_format(formatter_klass, options={})
+    formatter_klass.new(self, options).output
   end
 
   # override the cache key to include information about any objects that
   # affect the scopes passed to each row, e.g. a user
   def cache_key
     title.parameterize
-  end
-
-  # return a hash where each row is a key pointing to an array of cells
-  def raw
-    @cache ||= Hash[
-      rows.map do |row|
-        [row, columns.map { |col| Timely::Cell.new(self, col, row) }]
-      end
-    ]
-  end
-
-  # pass in a custom object that responds to `output`
-  def to_format(formatter_klass, options={})
-    formatter_klass.new(self, options).output
   end
 
   private
