@@ -1,17 +1,19 @@
-Gem::Specification.new do |s|
-  s.name = "timely"
-  s.summary = "Create reports about periods of time in your database."
-  s.description = "Create reports about periods of time in your database."
-  s.files = Dir["lib/**/*"] + ["MIT-LICENSE", "Rakefile", "README.md"]
-  s.version = "0.9"
-  s.authors = ["Nick Ragaz"]
-  s.email = "nick.ragaz@gmail.com"
-  s.homepage = "http://github.com/nragaz/timely"
+Gem::Specification.new do |spec|
+  spec.name         = "timely"
+  spec.summary      = "Create reports about periods of time in your database."
+  spec.description  = "Create reports about periods of time in your database."
+  spec.files        = Dir["lib/**/*"]+["MIT-LICENSE", "Rakefile", "README.md"]
+  spec.version      = "0.9"
+  spec.authors      = ["Nick Ragaz"]
+  spec.email        = "nick.ragaz@gmail.com"
+  spec.homepage     = "http://github.com/nragaz/timely"
 
-  s.add_dependency "activesupport", "~> 3.2.0"
-  s.add_dependency "activerecord", "~> 3.2.0"
-  s.add_dependency "ruby-ole"
-  s.add_dependency "spreadsheet"
+  spec.add_dependency "activesupport", "~> 3.2.0"
+  spec.add_dependency "activerecord", "~> 3.2.0"
+  spec.add_dependency "ruby-ole"
+  spec.add_dependency "spreadsheet"
 
-  s.add_development_dependency "sqlite3"
+  spec.add_development_dependency "bundler", "~> 1.3"
+  spec.add_development_dependency "rake"
+  spec.add_development_dependency "sqlite3"
 end
