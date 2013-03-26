@@ -10,6 +10,10 @@ module Timely
       self.row    = row
     end
 
+    def to_s
+      "#<#{self.class.name} row: \"#{row.title}\", starts_at: #{column.starts_at}, ends_at: #{column.ends_at}>"
+    end
+
     def column_key
       column.to_i
     end
@@ -45,7 +49,7 @@ module Timely
     end
 
     def value_from_rails_cache
-      Rails.cache.fetch(cache_key) { raw_value }
+      Rails.cache.fetch(cache_key) { value_without_caching }
     end
 
     # retrieve a cached value from a redis hash.
@@ -54,10 +58,10 @@ module Timely
     # the hash are keyed using the column's start/end timestamps
     def value_from_redis
       if val = Timely.redis.hget(redis_hash_key, redis_value_key)
-        val = BigDecimal.new(val)
+        val = val.include?(".") ? val.to_f : val.to_i
       else
-        val = raw_value
-        Timely.redis.set(redis_hash_key, redis_value_key, val)
+        val = value_without_caching
+        Timely.redis.hset(redis_hash_key, redis_value_key, val)
       end
 
       val

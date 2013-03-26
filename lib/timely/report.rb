@@ -26,20 +26,21 @@ class Timely::Report
     # want to have a `user` attribute on the report and scope each
     # row's data to that user's associations.
     def row(title, key=default_key, klass=default_klass, options={}, &scope)
-      @_row_args  ||= []
-      @_row_scopes ||= []
+      self._row_args   ||= []
+      self._row_scopes ||= []
 
       klass = symbol_to_row_class klass if klass.is_a?(Symbol)
 
-      @_row_args << [klass, [title, key, options]]
-      @_row_scopes << scope
+      self._row_args << [klass, [title, key, options]]
+      self._row_scopes << scope
     end
 
     private
 
     # :count -> Timely::Rows::Count
     def symbol_to_row_class(sym)
-      Timely::Rows.const_get(sym.to_s.camelcase)
+      klass = sym.to_s.camelcase
+      Timely::Rows.const_get(klass)
     rescue
       raise Timely::ConfigurationError, "No row class defined for #{klass}"
     end
@@ -47,23 +48,22 @@ class Timely::Report
 
   ## Instance Definition ##
 
-  attr_accessor :title, :period, :length, :starts_at
+  attr_accessor :title, :period, :length, :starts_at, :options
 
   # This can be overridden to set defaults by calling super(default args)
-  def initialize(options={}, &block)
+  def initialize(options={})
     options = options.symbolize_keys
     options.reverse_merge! period: :month
 
-    self.period       = options[:period].try(:intern)
-    self.length       = options[:length] || default_length
-    self.starts_at    = options[:starts_at] || default_starts_at
-    self.ends_at      = options[:ends_at] if options.has_key?(:ends_at)
-
-    instance_eval(&block)
+    self.period     = options[:period]
+    self.length     = options[:length] || default_length
+    self.starts_at  = options[:starts_at] || default_starts_at
+    self.ends_at    = options[:ends_at] if options.has_key?(:ends_at)
+    self.options    = options
   end
 
   def to_s
-    "<Timely::Report title: \"#{title}\" period: #{period} starts_at: #{starts_at} length: #{length}>"
+    "#<#{self.class.name} title: \"#{title}\", period: #{period}, starts_at: #{starts_at}, length: #{length}>"
   end
 
   # ensure that period is a valid symbol and not dangerous
@@ -116,11 +116,12 @@ class Timely::Report
   # return an array of row objects after evaluating each row's scope in the
   # context of self
   def rows
-    @rows ||= @_row_args.map.with_index do |args, i|
+    @rows ||= _row_args.map.with_index do |args, i|
       klass, args = args
 
       options = args.extract_options!
-      scope = self.instance_eval(&@_row_scopes[i])
+      proc    = _row_scopes[i]
+      scope   = self.instance_eval(&proc)
 
       klass.new(*args, scope, options)
     end
@@ -148,7 +149,7 @@ class Timely::Report
   def raw
     @cache ||= Hash[
       rows.map do |row|
-        [row, columns.map { |col| Timely::Cell.new(col, row) }]
+        [row, columns.map { |col| Timely::Cell.new(self, col, row) }]
       end
     ]
   end
@@ -174,8 +175,6 @@ class Timely::Report
   def to_missing_format(formatter_name, options={})
     formatter_klass = Timely::Formats.const_get(formatter_name.camelcase)
     to_format formatter_klass, options
-  rescue
-    raise Timely::ConfigurationError, "No class found for #{formatter_klass}"
   end
 
   # :month -> :months, etc.

@@ -7,4 +7,8 @@ class Timely::Formatter
     self.report = report
     self.options = options
   end
+
+  def to_s
+    "#<#{self.class.name} report: \"#{report.title}\">"
+  end
 end

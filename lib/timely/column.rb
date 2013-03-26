@@ -4,10 +4,13 @@ class Timely::Column
   attr_accessor :period, :starts_at, :options
 
   def initialize(period, starts_at, options={})
-    self.period = period
-    self.starts_at = starts_at
-    self.ends_at = ends_at
-    self.options = options
+    self.period     = period
+    self.starts_at  = starts_at
+    self.options    = options
+  end
+
+  def inspect
+    "#<#{self.class.name} period: #{period}, starts_at: #{starts_at}, ends_at: #{ends_at}>"
   end
 
   # calculate the end time

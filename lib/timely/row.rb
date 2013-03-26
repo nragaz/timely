@@ -27,6 +27,10 @@ class Timely::Row
     self.options = options
   end
 
+  def to_s
+    "#<#{self.class.name} title: \"#{title}\", key: #{key}>"
+  end
+
   def title
     @title.is_a?(Symbol) ? I18n.t("timely.rows.#{@title}") : @title
   end
@@ -104,6 +108,7 @@ class Timely::Row
 
   # if the column name does not specify the table, add the table name
   def disambiguate_column_name(col)
+    col = col.to_s
     col.include?(".") ? col : "#{scope.table_name}.#{col}"
   end
 
