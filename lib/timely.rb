@@ -81,20 +81,20 @@ module Timely
     case server
     when String
       if server =~ /redis\:\/\//
-        redis = Redis.connect(:url => server, :thread_safe => true)
+        redis = Redis.connect(url: server, thread_safe: true)
       else
         server, namespace = server.split('/', 2)
         host, port, db = server.split(':')
-        redis = Redis.new(:host => host, :port => port,
-          :thread_safe => true, :db => db)
+        redis = Redis.new(host: host, port: port,
+          thread_safe: true, db: db)
       end
-      namespace ||= :resque
+      namespace ||= :timely
 
       @redis = Redis::Namespace.new(namespace, :redis => redis)
     when Redis::Namespace
       @redis = server
     else
-      @redis = Redis::Namespace.new(:resque, :redis => server)
+      @redis = Redis::Namespace.new(:timely, :redis => server)
     end
   end
 
