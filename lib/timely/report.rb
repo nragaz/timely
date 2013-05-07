@@ -77,11 +77,15 @@ class Timely::Report
     else
       raise Timely::ConfigurationError, "period must be in the list: #{Timely.periods.join(", ")} (provided #{val})"
     end
+
+    reset
   end
 
   # ensure that length is an integer
   def length=(val)
     @length = val.to_i
+
+    reset
   end
 
   # round the given time to the beginning of the period in which the
@@ -94,6 +98,8 @@ class Timely::Report
     else
       @starts_at = val.send("beginning_of_#{period}")
     end
+
+    reset
   end
 
   # recalculate the length so that the report includes the given date
@@ -104,6 +110,8 @@ class Timely::Report
     period_duration = period == :quarter ? 3.months : 1.send(period)
 
     self.length = (duration_in_seconds.to_f / period_duration).ceil
+
+    reset
   end
 
   # calculate the end time
@@ -160,6 +168,13 @@ class Timely::Report
   # affect the scopes passed to each row, e.g. a user
   def cache_key
     title.parameterize
+  end
+
+  def reset
+    @rows     = nil
+    @columns  = nil
+    @cells    = nil
+    @cache    = nil
   end
 
   private
